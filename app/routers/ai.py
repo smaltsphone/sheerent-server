@@ -1,30 +1,32 @@
-import sys
-sys.path.append(r"C:\Users\radpion\Desktop\yolov5\yolov5")  # YOLOv5 소스코드 경로
-
-from fastapi import APIRouter, UploadFile, File
 import os
 import uuid
 from collections import defaultdict
+from fastapi import APIRouter, UploadFile, File
 import torch
+import sys
 
 router = APIRouter()
 
-# YOLOv5 모델 경로
-weights_path = r"C:\Users\radpion\Desktop\yolov5\yolov5\runs\train\my_yolo_model\weights\best.pt"
+# YOLOv5 모델 경로 설정 (상대 경로)
+base_dir = os.path.dirname(__file__)
+weights_path = os.path.abspath(os.path.join(base_dir, "../yolo_weights/best.pt"))
+detect_py_path = os.path.abspath(os.path.join(base_dir, "../yolo_weights/detect.py"))
+
+# YOLO 모델 로드
 model_data = torch.load(weights_path, map_location='cpu', weights_only=False)
 model = model_data['model'].float().fuse().eval()
 
-# 클래스 이름 (data.yaml 기준)
+# 클래스 이름
 class_names = ['crack', 'scratch']
 
-# YOLO 분석 함수 (폴더 단위)
+# YOLO 분석 함수 (이미지 폴더 단위)
 def run_yolo_with_folder(folder_path):
     temp_id = uuid.uuid4().hex
     output_dir = f"results/{temp_id}"
     os.makedirs(output_dir, exist_ok=True)
 
     command = (
-        f"python \"C:/Users/radpion/Desktop/yolov5/yolov5/detect.py\" "
+        f"python \"{detect_py_path}\" "
         f"--weights \"{weights_path}\" "
         f"--source \"{folder_path}\" "
         f"--conf 0.5 "
@@ -72,7 +74,7 @@ def is_item_damaged(item_id, rental_id):
 
     return f"{item_id}_{rental_id}", damage_detected, increased_classes
 
-# API 엔드포인트
+# AI 파손 체크 API
 @router.post("/check_damage/")
 async def check_damage(
     item_id: str,
