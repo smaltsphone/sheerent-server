@@ -9,6 +9,8 @@ router = APIRouter()
 
 # YOLOv5 모델 경로 설정 (상대 경로)
 base_dir = os.path.dirname(__file__)
+yolo_dir = os.path.abspath(os.path.join(base_dir, "../yolo_weights"))
+sys.path.append(yolo_dir)
 weights_path = os.path.abspath(os.path.join(base_dir, "../yolo_weights/best.pt"))
 detect_py_path = os.path.abspath(os.path.join(base_dir, "../yolo_weights/detect.py"))
 
