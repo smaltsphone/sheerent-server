@@ -11,3 +11,4 @@ numpy
 opencv-python
 matplotlib
 scipy
+pandas
