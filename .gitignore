@@ -1,0 +1,4 @@
+# Git이 무시할 폴더/파일
+results/
+__pycache__/
+*.pyc
