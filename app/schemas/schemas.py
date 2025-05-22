@@ -22,6 +22,9 @@ class User(BaseModel):
     name: str
     email: EmailStr
     phone: str
+    point: int
+    is_admin: bool
+
     class Config:
         from_attributes = True  # orm_mode 대신 pydantic v2 방식
 
@@ -41,6 +44,7 @@ class Item(BaseModel):
     description: str
     price_per_day: int
     status: ItemStatus
+    unit: str
     owner_id: int
     images: Optional[List[str]] = []  # ✅ 쉼표로 이어진 문자열
 
@@ -90,5 +94,4 @@ class UserLogin(BaseModel):
 class ReturnRequest(BaseModel):
     damage_reported: bool
     user_id: int  # 🔐 실제 로그인한 사용자
-
 

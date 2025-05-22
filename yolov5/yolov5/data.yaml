@@ -1,0 +1,5 @@
+train: C:/Users/user/Desktop/main3/dataset/images/train
+val: C:/Users/user/Desktop/main3/dataset/images/val
+
+nc: 
+names: ['crack', 'scratch']

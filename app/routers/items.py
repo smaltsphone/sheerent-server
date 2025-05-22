@@ -1,4 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, File, UploadFile, Form, Body
+from fastapi.responses import FileResponse
+import qrcode
 import shutil
 import os
 import uuid
@@ -72,7 +74,11 @@ async def create_item_with_images(
     print(f"🔥 업로드된 파일 수: {len(files)}")
     for idx, file in enumerate(files[:10]):
         ext = os.path.splitext(file.filename)[1]
-        filename = f"{idx}{ext}"
+        if idx == 0:
+            filename = f"before{ext}"  # ✅ 첫 번째 이미지를 before.jpg로
+        else:
+            filename = f"{idx}{ext}"   # 나머지는 1.jpg, 2.jpg ...
+
         file_path = os.path.join(item_dir, filename)
 
         with open(file_path, "wb") as buffer:
@@ -145,3 +151,16 @@ def delete_all_items(db: Session = Depends(get_db)):
 @router.get("/owned/{user_id}", response_model=List[ItemSchema])
 def get_items_by_owner(user_id: int, db: Session = Depends(get_db)):
     return db.query(Item).filter(Item.owner_id == user_id).all()
+
+@router.get("/{item_id}/qrcode")
+def get_item_qrcode(item_id: int):
+    save_dir = "qrcodes"
+    os.makedirs(save_dir, exist_ok=True)
+
+    qr_path = os.path.join(save_dir, f"item_{item_id}.png")
+
+    if not os.path.exists(qr_path):
+        qr = qrcode.make(str(item_id))
+        qr.save(qr_path)
+
+    return FileResponse(qr_path, media_type="image/png")
