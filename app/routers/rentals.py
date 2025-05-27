@@ -2,8 +2,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, 
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session, joinedload
 from typing import List, Optional
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import os
+import math
 
 from app.database import SessionLocal
 from app.models.models import Rental, Item, User
@@ -20,6 +21,9 @@ def get_db():
     finally:
         db.close()
 
+# KST 타임존 정의
+KST = timezone(timedelta(hours=9))
+
 # ✅ 요금 미리보기
 from pydantic import BaseModel
 
@@ -33,22 +37,31 @@ def rental_preview(request: RentalPreviewRequest, db: Session = Depends(get_db))
     if not item:
         raise HTTPException(status_code=404, detail="Item not found")
 
-    start_time = datetime.now()
+    start_time = datetime.now(KST)
     hours = int((request.end_time - start_time).total_seconds() // 3600)
-    price_per_hour = item.price_per_day
+    price_per_hour = item.price_per_day / 24
     total_fee = hours * price_per_hour
 
-    deposit = 10000
-    fee = 1000
-    total = total_fee + deposit + fee
+    insurance_fee = round(total_fee * 0.05)  # 보험금 5%
+    service_fee = round(total_fee * 0.05)    # 수수료 5%
+    total = total_fee + insurance_fee + service_fee
+
+    print(f"[Preview] 요청 item_id: {request.item_id}")
+    print(f"[Preview] 아이템 조회됨: {item.name}, 가격(1일): {item.price_per_day}")
+    print(f"[Preview] 현재시간(start_time): {start_time}")
+    print(f"[Preview] 대여 예상 시간(시): {hours}")
+    print(f"[Preview] 시간당 가격: {price_per_hour}")
+    print(f"[Preview] 기본 대여료: {total_fee}")
+    print(f"[Preview] 보험료: {insurance_fee}, 수수료: {service_fee}")
+    print(f"[Preview] 총 결제 금액: {total}")
 
     return {
         "item_name": item.name,
         "hours": hours,
         "price_per_hour": price_per_hour,
         "usage_fee": total_fee,
-        "deposit": deposit,
-        "fee": fee,
+        "insurance_fee": insurance_fee,
+        "service_fee": service_fee,
         "total": total
     }
 
@@ -59,7 +72,6 @@ def create_rental(rental: RentalCreate, db: Session = Depends(get_db)):
     if not db_item or db_item.status != "registered":
         raise HTTPException(status_code=400, detail="대여할 수 없는 아이템입니다.")
 
-# ✅ 자신이 등록한 물건은 대여 불가
     if db_item.owner_id == rental.borrower_id:
         raise HTTPException(status_code=400, detail="자신이 등록한 물품은 대여할 수 없습니다.")
 
@@ -70,29 +82,44 @@ def create_rental(rental: RentalCreate, db: Session = Depends(get_db)):
     if active_rental:
         raise HTTPException(status_code=400, detail="해당 아이템은 아직 반납되지 않았습니다.")
 
-    deposit = 10000
-    fee = 1000
-    total_deduct = deposit + fee
+    start_time = datetime.now(KST)  # 현재 시간 (KST 기준)
+
+    end_time = rental.end_time
+    if end_time.tzinfo is None or end_time.tzinfo.utcoffset(end_time) is None:
+        end_time = end_time.replace(tzinfo=KST)
+
+    if end_time <= start_time:
+        raise HTTPException(status_code=400, detail="종료시간은 시작시간보다 나중이어야 합니다.")
+
+    hours = max(1, math.ceil((end_time - start_time).total_seconds() / 3600))
+
+    # 단위(per_day or per_hour)에 따라 시간당 가격 계산
+    if db_item.unit == "per_day":
+        price_per_hour = db_item.price_per_day / 24
+    else:
+        price_per_hour = db_item.price_per_day  # per_hour일 경우
+
+    rental_price = price_per_hour * hours
+    insurance_fee = round(rental_price * 0.05)  # 보험료 5%
+    service_fee = round(rental_price * 0.05)    # 수수료 5%
+    total_pay = rental_price + insurance_fee + service_fee
 
     db_user = db.query(User).filter(User.id == rental.borrower_id).first()
     if not db_user:
         raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
-    if db_user.point < total_deduct:
-        raise HTTPException(status_code=400, detail="포인트가 부족합니다. 충전 후 다시 시도하세요.")
-    db_user.point -= total_deduct
+    if db_user.point < total_pay:
+        raise HTTPException(status_code=400, detail="포인트가 부족합니다.")
 
-    end_time = rental.end_time
-    if end_time.hour == 0 and end_time.minute == 0 and end_time.second == 0:
-        end_time = datetime.combine(end_time.date(), time(23, 59, 59))
-
+    db_user.point -= int(total_pay)
     db_item.status = "rented"
+
     new_rental = Rental(
         item_id=rental.item_id,
         borrower_id=rental.borrower_id,
-        start_time=datetime.utcnow(),
+        start_time=start_time,
         end_time=end_time,
         is_returned=False,
-        deposit_amount=deposit,
+        deposit_amount=insurance_fee,
         damage_reported=False,
         deducted_amount=0
     )
@@ -100,7 +127,25 @@ def create_rental(rental: RentalCreate, db: Session = Depends(get_db)):
     db.add(new_rental)
     db.commit()
     db.refresh(new_rental)
+
+    # 디버그용 출력
+    print(f"[Create Rental] 요청 item_id: {rental.item_id}, borrower_id: {rental.borrower_id}")
+    print(f"[Create Rental] 아이템 상태: {db_item.status if db_item else 'None'}")
+    print(f"[Create Rental] 대여자와 소유자 비교: borrower_id={rental.borrower_id}, owner_id={db_item.owner_id if db_item else 'None'}")
+    print(f"[Create Rental] 대여중인 렌탈 존재 여부: {active_rental is not None}")
+    print(f"[Create Rental] 시작시간(start_time): {start_time}")
+    print(f"[Create Rental] 종료시간(end_time): {end_time}")
+    print(f"[Create Rental] 대여 시간(시): {hours}")
+    print(f"[Create Rental] 시간당 가격: {price_per_hour}")
+    print(f"[Create Rental] 일당 가격: {db_item.price_per_day}")
+    print(f"[Create Rental] 대여료: {rental_price}")
+    print(f"[Create Rental] 보험료: {insurance_fee}, 수수료: {service_fee}")
+    print(f"[Create Rental] 총 결제 금액: {total_pay}")
+    print(f"[Create Rental] 사용자 포인트 차감 후: {db_user.point if db_user else 'None'}")
+
     return new_rental
+
+
 # ✅ 2. 전체 대여 조회 + 필터링
 @router.get("/", response_model=List[RentalSchema])
 def get_rentals(is_returned: Optional[bool] = Query(None), db: Session = Depends(get_db)):
@@ -205,13 +250,9 @@ def extend_rental(rental_id: int, db: Session = Depends(get_db)):
     if not rental:
         raise HTTPException(status_code=404, detail="대여 기록을 찾을 수 없습니다.")
     if rental.is_returned:
-        raise HTTPException(status_code=400, detail="이미 반납된 대여는 연장할 수 없습니다.")
-    
-    rental.end_time += timedelta(days=1)
+        raise HTTPException(status_code=400, detail="이미 반납된 대여입니다.")
 
+    rental.end_time += timedelta(days=1)
     db.commit()
     db.refresh(rental)
-    return {
-        "message": "연장 완료",
-        "new_end_time": rental.end_time.isoformat()
-    }
+    return rental

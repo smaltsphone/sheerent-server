@@ -1,5 +1,5 @@
 import sys
-sys.path.append(r"C:\Users\radpion\Desktop\yolov5\yolov5")  # YOLOv5 소스코드 폴더 경로
+sys.path.append(r"C:\Users\user\Desktop\yolov5\yolov5")  # YOLOv5 소스코드 폴더 경로
 
 import os
 import torch
