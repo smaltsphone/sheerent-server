@@ -89,7 +89,7 @@ def create_rental(rental: RentalCreate, db: Session = Depends(get_db)):
 
     hours = max(1, math.ceil((end_time - start_time).total_seconds() / 3600))
 
-    # 단위에 따른 시간당 가격 계산d
+    # 단위에 따른 시간당 가격 계산1
     if db_item.unit == "per_day":
         price_per_hour = db_item.price_per_day / 24
     else:
