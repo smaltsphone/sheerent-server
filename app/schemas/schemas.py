@@ -8,6 +8,7 @@ class ItemStatus(str, PyEnum):
     registered = "registered"
     rented = "rented"
     returned = "returned"
+    available = "available"
 
 # ✅ 사용자 등록용 (요청용)
 class UserCreate(BaseModel):
@@ -47,6 +48,8 @@ class Item(BaseModel):
     unit: str
     owner_id: int
     images: Optional[List[str]] = []  # ✅ 쉼표로 이어진 문자열
+    locker_number: Optional[str] = None
+    description: Optional[str] = None
 
     class Config:
         orm_mode = True
@@ -54,6 +57,7 @@ class Item(BaseModel):
 class ItemForRental(BaseModel):
     id: int
     name: str
+    description: str
     price_per_day: int
     status: str
     images: Optional[List[str]] = []
@@ -63,7 +67,13 @@ class ItemForRental(BaseModel):
 
 # ✅ 아이템 상태 수동 변경용
 class ItemStatusUpdate(BaseModel):
-    status: ItemStatus
+    name: Optional[str]
+    description: Optional[str]
+    price_per_day: Optional[int]
+    unit: Optional[str]
+    locker_number: Optional[int] = None
+    status: Optional[str]
+    images: Optional[List[str]]
 
 # ✅ 대여 등록용 (요청용)
 class RentalCreate(BaseModel):
@@ -75,6 +85,7 @@ class RentalCreate(BaseModel):
 class Rental(BaseModel):
     id: int
     item_id: Optional[int] = None
+    description: Optional[str] = None
     borrower_id: int
     start_time: datetime
     end_time: datetime

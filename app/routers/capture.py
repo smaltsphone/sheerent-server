@@ -15,3 +15,6 @@ def capture():
             return {"error": f"라즈베리파이 응답 오류: {raspberry_response.status_code}"}
     except Exception as e:
         return {"error": f"라즈베리파이 연결 실패: {str(e)}"}
+
+
+

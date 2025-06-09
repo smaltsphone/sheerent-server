@@ -128,21 +128,6 @@ def create_rental(rental: RentalCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(new_rental)
 
-    # 디버그용 출력
-    print(f"[Create Rental] 요청 item_id: {rental.item_id}, borrower_id: {rental.borrower_id}")
-    print(f"[Create Rental] 아이템 상태: {db_item.status if db_item else 'None'}")
-    print(f"[Create Rental] 대여자와 소유자 비교: borrower_id={rental.borrower_id}, owner_id={db_item.owner_id if db_item else 'None'}")
-    print(f"[Create Rental] 대여중인 렌탈 존재 여부: {active_rental is not None}")
-    print(f"[Create Rental] 시작시간(start_time): {start_time}")
-    print(f"[Create Rental] 종료시간(end_time): {end_time}")
-    print(f"[Create Rental] 대여 시간(시): {hours}")
-    print(f"[Create Rental] 시간당 가격: {price_per_hour}")
-    print(f"[Create Rental] 일당 가격: {db_item.price_per_day}")
-    print(f"[Create Rental] 대여료: {rental_price}")
-    print(f"[Create Rental] 보험료: {insurance_fee}, 수수료: {service_fee}")
-    print(f"[Create Rental] 총 결제 금액: {total_pay}")
-    print(f"[Create Rental] 사용자 포인트 차감 후: {db_user.point if db_user else 'None'}")
-
     return new_rental
 
 
@@ -204,6 +189,7 @@ async def return_rental(
         "item": {
             "id": rental.item.id,
             "name": rental.item.name,
+            "description": rental.item.description,
             "price_per_day": rental.item.price_per_day,
             "status": rental.item.status,
             "images": rental.item.images
@@ -255,4 +241,4 @@ def extend_rental(rental_id: int, db: Session = Depends(get_db)):
     rental.end_time += timedelta(days=1)
     db.commit()
     db.refresh(rental)
-    return rental
+    return rental 
