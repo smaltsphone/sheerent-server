@@ -92,7 +92,6 @@ def create_rental(rental: RentalCreate, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail="종료시간은 시작시간보다 나중이어야 합니다.")
 
     hours = max(1, math.ceil((end_time - start_time).total_seconds() / 3600))
-
     # 단위(per_day or per_hour)에 따라 시간당 가격 계산
     if db_item.unit == "per_day":
         price_per_hour = db_item.price_per_day / 24
